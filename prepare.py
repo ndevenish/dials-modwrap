@@ -1,11 +1,24 @@
 #!/usr/bin/env python
 
-
 import os, sys
 import subprocess
 import shutil
 
-if 
+def merge_tree(src, dst):
+  """Copy all files in source tree to destination, merging with an existing tree."""
+  for path, dirs, files in os.walk(src):
+    relpath = path[len(src)+1:]
+    # Copy files over
+    for file in files:
+      fullsrcpath = os.path.join(path, file)
+      fulldstpath = os.path.join(dst, relpath, file)
+      shutil.copy2(fullsrcpath, fulldstpath)
+    # Ensure the subdirectories exist
+    for dir in dirs:
+      fulldstpath = os.path.join(dst, relpath, dir)
+      if not os.path.exists(fulldstpath):
+        print("Making ", fulldstpath)
+
 # Map of folder names to repository locations
 repositories = {
   "dials":          "https://github.com/dials/dials.git",
@@ -24,5 +37,8 @@ for name, url in repositories.items():
   # Assume that if the path exists at all, the user knows what they are doing
   if os.path.exists(name):
     continue
-
   subprocess.check_call(["git", "clone", "--depth=1", url])
+
+# Copy over tree of files from cmake
+merge_tree("cmake/cmakelists", os.getcwd())
+shutil.copy2("cmake/RootCMakeLists.txt", "CMakeLists.txt")
