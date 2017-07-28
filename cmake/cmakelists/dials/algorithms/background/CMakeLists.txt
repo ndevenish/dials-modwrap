@@ -1,0 +1,5 @@
+add_subdirectory(boost_python)
+add_subdirectory(glm)
+add_subdirectory(gmodel)
+add_subdirectory(median)
+add_subdirectory(simple)

@@ -1,0 +1,12 @@
+add_executable(tst_geometrical_hydrogens tst_geometrical_hydrogens.cpp)
+target_link_libraries(tst_geometrical_hydrogens cctbx smtbx_refinement_constraints)
+add_test(NAME tst_geometrical_hydrogens COMMAND tst_geometrical_hydrogens)
+
+add_executable(tst_reparametrisation tst_reparametrisation.cpp)
+target_link_libraries(tst_reparametrisation cctbx smtbx_refinement_constraints)
+add_test(NAME tst_reparametrisation COMMAND tst_reparametrisation)
+
+add_executable(tst_special_position tst_special_position.cpp)
+target_link_libraries(tst_special_position cctbx smtbx_refinement_constraints)
+add_test(NAME tst_special_position COMMAND tst_special_position)
+

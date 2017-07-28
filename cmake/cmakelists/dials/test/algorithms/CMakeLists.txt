@@ -1,0 +1,2 @@
+add_subdirectory(spatial_indexing)
+add_subdirectory(spot_prediction)

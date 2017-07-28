@@ -1,0 +1,5 @@
+add_subdirectory(bayes)
+add_subdirectory(boost_python)
+add_subdirectory(fit)
+add_subdirectory(maximum_likelihood)
+add_subdirectory(sum)

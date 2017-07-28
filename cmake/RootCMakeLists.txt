@@ -1,0 +1,162 @@
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+# Boost imported target and cmake_parse_arguments were added in 3.5
+
+# Add the included modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+include(LibTBXRefresher)
+
+option(BUILD_PYTHON_LIBS "Build the python shared libraries" ON)
+option(BUILD_SHARED_LIBS "Build libraries as shared libraries" ON)
+
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+set(CMAKE_CXX_STANDARD 98)
+
+if (${BUILD_PYTHON_LIBS})
+  # Add python interpreter as an imported executable
+  find_package(PythonInterp REQUIRED)  
+  add_executable(Python::Python IMPORTED)
+  set_target_properties(Python::Python PROPERTIES
+    IMPORTED_LOCATION ${PYTHON_EXECUTABLE})
+
+  # Add python libraries as an imported library
+  find_package(PythonLibs REQUIRED)
+  add_library(Python::Libs SHARED IMPORTED)
+  set_target_properties(Python::Libs PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES ${PYTHON_INCLUDE_DIRS}
+    IMPORTED_LOCATION             ${PYTHON_LIBRARIES} )
+
+  # Find boost python libraries
+  find_package(Boost REQUIRED COMPONENTS python)
+  include_directories(${PYTHON_INCLUDE_DIRS})
+  # Add python as a link property
+  set_property( TARGET Boost::python
+                APPEND 
+                PROPERTY IMPORTED_LINK_INTERFACE_LIBRARIES Python::Libs)
+else()
+  find_package(Boost REQUIRED)
+endif()
+message("Found Boost headers at: ${Boost_INCLUDE_DIRS}")
+
+find_package(TIFF REQUIRED)
+find_package(OpenGL)
+find_package(Eigen3 REQUIRED)
+
+# Used by CBFlib, if present
+find_package(PCRE)
+
+# Add HDF5
+find_package(HDF5 REQUIRED COMPONENTS C)
+add_library(HDF5::HDF5 INTERFACE IMPORTED)
+message("Original HDF5 defs: ${HDF5_DEFINITIONS}")
+string(REGEX REPLACE "(^|\\s|;)-D" ";" HDF5_DEFINITIONS_CLEAN    "${HDF5_DEFINITIONS}")
+string(REGEX REPLACE "(^|\\s|;)-D" ";" HDF5_C_DEFINITIONS_CLEAN  "${HDF5_C_DEFINITIONS}")
+set_target_properties(HDF5::HDF5 PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${HDF5_INCLUDE_DIRS}"
+  INTERFACE_COMPILE_DEFINITIONS "${HDF5_DEFINITIONS_CLEAN}"
+  INTERFACE_LINK_LIBRARIES      "${HDF5_LIBRARIES}" )
+# add_library(HDF5::CXX INTERFACE IMPORTED)
+# set_target_properties(HDF5::CXX PROPERTIES
+#   INTERFACE_INCLUDE_DIRECTORIES "${HDF5_CXX_INCLUDE_DIRS}"
+#   INTERFACE_COMPILE_DEFINITIONS "${HDF5_CXX_DEFINITIONS}"
+#   INTERFACE_LINK_LIBRARIES      "${HDF5_CXX_LIBRARIES};HDF5::HDF5" )
+# add_dependencies(HDF5::CXX HDF5::HDF5)
+add_library(HDF5::C INTERFACE IMPORTED)
+set_target_properties(HDF5::C PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${HDF5_C_INCLUDE_DIRS}"
+  INTERFACE_COMPILE_DEFINITIONS "${HDF5_C_DEFINITIONS_CLEAN}"
+  INTERFACE_LINK_LIBRARIES      "${HDF5_C_LIBRARIES};HDF5::HDF5")
+add_dependencies(HDF5::C HDF5::HDF5)
+
+message("HDF5:")
+message("      i: ${HDF5_INCLUDE_DIRS}")
+message("      D: ${HDF5_DEFINITIONS_CLEAN}")
+message("      l: ${HDF5_LIBRARIES}")
+message(" CXX: i: ${HDF5_CXX_INCLUDE_DIRS}")
+message("      D: ${HDF5_CXX_DEFINITIONS}")
+message("      l: ${HDF5_CXX_LIBRARIES}")
+message("   C: i: ${HDF5_C_INCLUDE_DIRS}")
+message("      D: ${HDF5_C_DEFINITIONS_CLEAN}")
+message("      l: ${HDF5_C_LIBRARIES}")
+
+enable_testing()
+
+function(set_project_relative_folder target)
+  string(REGEX REPLACE "^${PROJECT_SOURCE_DIR}/?" "" PROJECT_RELATIVE_DIR ${CMAKE_CURRENT_LIST_DIR})
+  # message("In Project ${PROJECT_SOURCE_DIR}")
+  # message("           ${CMAKE_CURRENT_LIST_DIR}")
+  # message("         = ${PROJECT_RELATIVE_DIR}")
+  set_target_properties (${name} PROPERTIES FOLDER "${PROJECT_NAME}/${PROJECT_RELATIVE_DIR}")
+  # message("           Setting relative folder for ${target} to ${PROJECT_RELATIVE_DIR}")
+endfunction()
+
+# Convenience function for setting up python shared libraries
+# Usage: add_python_library( <name> SOURCES <file> [<file>]... )
+function(add_python_library name)
+
+  if (BUILD_PYTHON_LIBS)
+    add_library(${name} MODULE ${ARGN})
+    # Tie to current project if we've set one
+    if (NOT ${PROJECT_NAME} MATCHES "^Project$")
+      # Add to a project meta-target
+      if(NOT TARGET ${PROJECT_NAME}_meta)
+        add_custom_target(${PROJECT_NAME}_meta)
+        set_target_properties (${PROJECT_NAME}_meta PROPERTIES FOLDER meta)
+      endif()
+      add_dependencies(${PROJECT_NAME}_meta ${name})
+
+      # If the project name is also a target, then add it as a dependency
+      if (TARGET ${PROJECT_NAME})
+        target_link_libraries(${name} ${PROJECT_NAME})
+      endif()
+      
+      set_project_relative_folder(${name})
+    endif()
+
+    target_link_libraries(${name} Boost::python )
+    set_target_properties(${name} PROPERTIES PREFIX "")
+  endif()
+endfunction()
+
+# Add generated sources to a target
+function(add_generated_sources target )
+  foreach(f ${ARGN})
+    set(ABS_SRC "${CMAKE_BINARY_DIR}/${f}" )
+    set_source_files_properties("${ABS_SRC}" PROPERTIES GENERATED TRUE)
+    target_sources(${target} PRIVATE ${ABS_SRC})
+  endforeach()
+endfunction()
+
+# FUNCTION(PREPEND var prefix)
+#    SET(listVar "")
+#    FOREACH(f ${ARGN})
+#       LIST(APPEND listVar "${prefix}/${f}")
+#    ENDFOREACH(f)
+#    SET(${var} "${listVar}" PARENT_SCOPE)
+# ENDFUNCTION(PREPEND)
+
+# Include the three standard 'everything' directories - module, cctbx_project and build include
+include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/cctbx_project ${CMAKE_BINARY_DIR}/include)
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/lib")
+
+# Write the Boost adaptbx size_t file - this is specially generated
+include(BoostAdapTBXSizing)
+# Do the CCP4IOGenration steps
+include(CCP4IOGeneration)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/ccp4_diskio_f.c ccp4io_adaptbx/ccp4_diskio_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/ccp4/ccp4_general.c ccp4io_adaptbx/ccp4_general.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/ccp4_general_f.c ccp4io_adaptbx/ccp4_general_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/ccp4_parser_f.c ccp4io_adaptbx/ccp4_parser_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/ccp4/ccp4_program.c ccp4io_adaptbx/ccp4_program.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/ccp4_unitcell_f.c ccp4io_adaptbx/ccp4_unitcell_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/cmaplib_f.c ccp4io_adaptbx/cmaplib_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/cmtzlib_f.c ccp4io_adaptbx/cmtzlib_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/csymlib_f.c ccp4io_adaptbx/csymlib_f.c)
+rewrite_printf(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/fortran/library_f.c ccp4io_adaptbx/library_f.c)
+rewrite_csymlib(${CMAKE_SOURCE_DIR}/ccp4io/libccp4/ccp4/csymlib.c ccp4io_adaptbx/csymlib.c)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include(autogen_CMakeLists.txt)
+

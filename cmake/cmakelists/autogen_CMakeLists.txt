@@ -1,0 +1,8 @@
+add_subdirectory(annlib)
+add_subdirectory(annlib_adaptbx)
+add_subdirectory(cbflib)
+add_subdirectory(ccp4io)
+add_subdirectory(ccp4io_adaptbx)
+add_subdirectory(cctbx_project)
+add_subdirectory(dials)
+add_subdirectory(xia2)

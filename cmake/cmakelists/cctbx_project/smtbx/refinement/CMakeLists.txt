@@ -1,0 +1,3 @@
+add_subdirectory(boost_python)
+add_subdirectory(constraints)
+add_subdirectory(restraints)
